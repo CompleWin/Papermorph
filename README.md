@@ -28,15 +28,17 @@ This Skill takes it further: books you can explore, listen to, and interact with
 </p>
 
 ```text
-PDF -> Book plan -> Storyboards -> Narration -> Animation & quizzes -> Web book
+PDF -> A short conversation (style.json) -> Storyboards -> Narration -> Animation & quizzes -> Web book
 ```
+
+The Skill starts by asking: it finds your PDF, says what the book is, suggests a chapter to try and an animation tier, and offers options at every step, so you can just pick the recommended one. Your choices are saved in `style.json`, the style every later chapter is made against.
 
 **Today:** Built with Opus 5.5, and tested with other models (see [Models](#models)). No image models, multilingual support, or BGM yet.
 
 ## Roadmap
 
 - [x] **Math books:** formulas and diagrams that change step by step, with quizzes. Two books on the shelf.
-- [ ] **Physics books:** illustrated scenes, acting characters and camera work. Chapters 9–11 are on the shelf; the new Skill that makes them is being refined.
+- [ ] **Physics books:** illustrated scenes, acting characters and camera work. Chapters 9–12 are on the shelf; chapter 12 was made by the new Skill.
 - [ ] **Picture books:** image models and storyboards for interactive picture books. In local testing.
 - [ ] **Humanities documentaries:** history and social science titles.
 
@@ -53,12 +55,33 @@ npx skills add DozenTwelve/Papermorph --skill papermorph --agent claude-code
 In Claude Code with Opus 5.5, run:
 
 ```text
-/papermorph Turn /path/to/book.pdf into
-an animated interactive web book.
-
-Target readers: [your audience].
-Start with one English chapter for review.
+/papermorph
 ```
+
+It looks for the PDF in your project, then asks the rest. Diagrams that change (tier 1) suit maths and other abstract topics; illustrated scenes (tier 2) suit physics and stories. Picture books and documentaries are coming.
+
+Before you review a chapter, `scripts/lint.py` catches broken names, missing audio and stale narration in under a second.
+
+## Player and engine
+
+Every book plays in the same player: speed control (`<` `>`), click anywhere on a step to jump there, captions, keyboard shortcuts, and progress saved per book.
+
+The player engine lives in [`engine/`](engine), apart from the Skill, so a fix reaches every book without touching the Skill. Fork it if you like, and point the Skill at your fork:
+
+```bash
+python3 .claude/skills/papermorph/scripts/engine.py site --from you/your-fork@main
+```
+
+## Export to video
+
+Any chapter can be rendered to MP4 (1080p) with an `.srt` for YouTube or Bilibili:
+
+```bash
+uv run --with playwright .claude/skills/papermorph/scripts/export.py ch12 \
+  --url http://localhost:8765/science/ --link https://papermorph.diamonddoge.org/science/ch12/
+```
+
+Frames come straight from the lesson clock, so the video matches the page. Quizzes stay in the interactive version; the video ends by pointing there.
 
 ## Models
 

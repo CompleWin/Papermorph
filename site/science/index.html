@@ -118,6 +118,8 @@ main#contents { padding-bottom: 80px; }
 @keyframes step { 0%, 20%, 100% { fill-opacity: 1; } 10% { fill-opacity: .3; } }
 .unit-art .hop, .unit-art .ride { offset-rotate: 0deg; }
 .seen .unit-art .hop { animation: art-fade .4s ease-out 2s forwards, along 3.4s linear 2s infinite; }
+.unit-art .orbit { offset-rotate: 0deg; }
+.seen .unit-art .orbit { animation: art-fade .4s ease-out 2s forwards, along 9s linear 2s infinite; }
 .seen .unit-art .ride { animation: art-fade .4s ease-out 2s forwards, along 4s ease-in-out 2s infinite alternate; }
 @keyframes along { from { offset-distance: 0%; } to { offset-distance: 100%; } }
 .unit-art .pie { stroke: currentColor; stroke-linecap: butt; stroke-dasharray: 0 100; }
@@ -169,6 +171,9 @@ main#contents { padding-bottom: 80px; }
 
 /* ---------- page-to-page motion ---------- */
 @view-transition { navigation: auto; }
+/* Firefox flickers through view transitions (the header blinks for several frames): it switches without one, and the
+   contents still rise in. -moz-orient exists only in Firefox. */
+@supports (-moz-orient: inline) { @view-transition { navigation: none; } }
 ::view-transition-group(*) { animation-duration: .5s; animation-timing-function: var(--ease); }
 ::view-transition-old(lesson), ::view-transition-new(lesson) { height: 100%; object-fit: cover; }
 ::view-transition-old(lesson) { animation-duration: .18s; }
@@ -225,9 +230,12 @@ main#contents { padding-bottom: 80px; }
 'use strict';
 // Physics only: the book's chapters 9–17 (units 3–4) keep their original numbers. START gives the first unit and
 // chapter numbers; chapters are numbered in order from there. Add a chapter here when its lesson is ready.
+// A unit's optional third entry { unit, chapter, sample } numbers it from elsewhere in the book; a sample chapter, made
+// to show another look, is labelled as one and not counted with the book's chapters.
 const START = { unit: 3, chapter: 9 };
 const UNITS = [   // [unit title, [[chapter title, minutes], ...]]
-  ['Motion, Forces, and Work', [['Motion', 18], ['Force and Newton’s Laws of Motion', 13], ['Gravity, Friction, and More Forces in Everyday Life', 15]]],
+  ['Motion, Forces, and Work', [['Motion', 18], ['Force and Newton’s Laws of Motion', 13], ['Gravity, Friction, and More Forces in Everyday Life', 15], ['Work and Machines', 14]]],
+  ['Outer Space: the Sun, Earth and Moon', [['The Sun-Earth-Moon System', 14]], { unit: 5, chapter: 19, sample: true }],
 ];
 const HUES = ['#f4a48c', '#86c9e8', '#f3c95c', '#e8a0c8', '#8fd6b0', '#bba8ee', '#f0b45a'];
 const id = n => 'ch' + String(n).padStart(2, '0');
@@ -242,9 +250,11 @@ const done = new Set(Array.isArray(P.done) ? P.done.filter(n => Number.isInteger
 // Contents.
 let n = START.chapter - 1, total = 0, i = 0;   // i staggers the entrance, in reading order
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-document.getElementById('units').innerHTML = UNITS.map(([name, chs], u) => {
-  return `<section class="unit" style="--c:${HUES[u % HUES.length]};--i:${i++}"><svg class="unit-art" viewBox="0 0 600 180" aria-hidden="true">${UNIT_ART[u] || ''}</svg><h2><span>Unit ${u + START.unit}</span>${esc(name)}</h2><div class="grid">` +
-    chs.map(([t, min]) => { n++; total++;
+const samples = new Set();
+document.getElementById('units').innerHTML = UNITS.map(([name, chs, o = {}], u) => {
+  if (o.chapter) n = o.chapter - 1;
+  return `<section class="unit" style="--c:${HUES[u % HUES.length]};--i:${i++}"><svg class="unit-art" viewBox="0 0 600 180" aria-hidden="true">${UNIT_ART[u] || ''}</svg><h2><span>Unit ${o.unit ?? u + START.unit}${o.sample ? ' · Sample chapter, another look' : ''}</span>${esc(name)}</h2><div class="grid">` +
+    chs.map(([t, min]) => { n++; if (o.sample) samples.add(n); else total++;
       const cls = 'ch' + (done.has(n) ? ' done' : '') + (P.last === n ? ' last' : '');
       return `<a class="${cls}" id="${id(n)}" href="${id(n)}/" style="--i:${i++}"><b>${n}</b><span>${esc(t)}</span><small>${min} min</small></a>`;
     }).join('') + '</div></section>';
@@ -252,10 +262,10 @@ document.getElementById('units').innerHTML = UNITS.map(([name, chs], u) => {
 // A unit's sketch draws itself the first time the unit scrolls into view.
 const seen = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('seen'); seen.unobserve(e.target); } }), { threshold: .25 });
 document.querySelectorAll('.unit').forEach(u => seen.observe(u));
-const finished = [...done].filter(k => k >= START.chapter && k <= n).length;
+const finished = [...done].filter(k => k >= START.chapter && k <= n && !samples.has(k)).length;
 document.getElementById('prog').innerHTML = finished ? `<b>${finished}</b> of ${total} finished` : `${total} chapter${total === 1 ? '' : 's'}`;
 const pl = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
-document.getElementById('meta').textContent = `${pl(total, 'chapter')} · ${pl(UNITS.length, 'unit')} · with sound`;
+document.getElementById('meta').textContent = `${pl(total, 'chapter')}${samples.size ? ` + ${samples.size} sample` : ''} · ${pl(UNITS.filter(x => !x[2]?.sample).length, 'unit')} · with sound`;
 const last = Number.isInteger(P.last) && document.getElementById(id(P.last));
 if (last) {
   const r = document.getElementById('resume');
@@ -300,7 +310,7 @@ function show(animate) {
       heading?.focus({ preventScroll: true });
     }
   };
-  if (animate && document.startViewTransition && !reduced) {
+  if (animate && document.startViewTransition && !reduced && !CSS.supports('-moz-orient', 'inline')) {
     const transition = document.startViewTransition(apply);
     // Navigation can interrupt either promise; the new view is already applied.
     transition.ready.catch(() => {});

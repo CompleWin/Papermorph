@@ -1,9 +1,13 @@
-"""Generate narration audio and word-mark timings with Edge TTS.
+"""Generate narration audio and word-mark timings with Edge TTS or Kokoro.
 
 Usage (from the project root; SKILL is this skill's folder):
     uv run --with edge-tts $SKILL/scripts/tts.py content/ch01/narration.en.json site/ch01/audio/en
+    uv run --python 3.12 --with kokoro $SKILL/scripts/tts.py ...      # narration with "engine": "kokoro"
 
-Needs network access and ffprobe (from ffmpeg) for clip durations.
+The narration file names the engine ("edge", the default, or "kokoro"), the voice and the rate. Edge needs network
+access. Kokoro (Apache 2.0) runs locally: its first run downloads the model (about 330 MB) and an English dictionary;
+voices start with the accent's letter (am_michael, af_heart: American; bm_george, bf_emma: British) and its word
+timings cover English. Both need ffmpeg/ffprobe.
 
 Narration text may contain [[mark]] tags placed before a word. The output
 timings.js records each clip's duration and the time (seconds) at which the
@@ -31,8 +35,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import edge_tts
-from edge_tts.exceptions import NoAudioReceived
 
 MARK = re.compile(r"\[\[(\w+)\]\]")
 MAX_ATTEMPTS = 5          # requests per beat when Edge returns no audio
@@ -41,6 +43,7 @@ PROBE_TEXT = "1, 2, 3."   # checks the voice after a beat fails; any voice reads
 
 
 async def synth(text, voice, rate, mp3_path):
+    import edge_tts
     words = []  # (seconds, word)
     comm = edge_tts.Communicate(text, voice, rate=rate, boundary="WordBoundary")
     with open(mp3_path, "wb") as f:
@@ -54,6 +57,7 @@ async def synth(text, voice, rate, mp3_path):
 
 async def synth_with_retries(beat, text, voice, rate, mp3_path):
     """synth(), requested again after NoAudioReceived; each attempt rewrites mp3_path from the start."""
+    from edge_tts.exceptions import NoAudioReceived
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             return await synth(text, voice, rate, mp3_path)
@@ -68,6 +72,7 @@ async def synth_with_retries(beat, text, voice, rate, mp3_path):
 
 async def explain_no_audio(beat, voice, rate, out_dir):
     """The message for a beat that ran out of attempts: whether the voice or this beat's text failed."""
+    from edge_tts.exceptions import NoAudioReceived
     with tempfile.NamedTemporaryFile(dir=out_dir, prefix=".probe-", suffix=".mp3", delete=False) as f:
         probe_path = Path(f.name)
     try:
@@ -83,6 +88,39 @@ async def explain_no_audio(beat, voice, rate, out_dir):
     return (f"{beat}: the voice {voice} returned no audio {MAX_ATTEMPTS} times, and also for a short test phrase, "
             "so the voice is unavailable at Edge right now; the text is not the cause. Completed beats are saved. "
             "Rerun later, or choose another voice for the whole book (uv run --with edge-tts edge-tts --list-voices).")
+
+
+async def edge_beat(beat, text, voice, rate, mp3_path, out_dir):
+    from edge_tts.exceptions import NoAudioReceived
+    try:
+        return await synth_with_retries(beat, text, voice, rate, mp3_path)
+    except NoAudioReceived:
+        raise SystemExit(await explain_no_audio(beat, voice, rate, out_dir)) from None
+
+
+KOKORO = {}   # one pipeline per accent, loaded once per run
+
+
+def kokoro_beat(text, voice, rate, mp3_path):
+    """Synthesize locally with Kokoro; word start times come from its predicted durations."""
+    import numpy as np
+    from kokoro import KPipeline
+    lang = voice[0]
+    if lang not in KOKORO:
+        KOKORO[lang] = KPipeline(lang_code=lang, repo_id="hexgrad/Kokoro-82M")
+    speed = 1 + float(rate.rstrip("%")) / 100 if rate else 1
+    words, chunks, offset = [], [], 0.0
+    for r in KOKORO[lang](text, voice=voice, speed=speed):
+        audio = np.asarray(r.audio, dtype=np.float32)
+        for tk in r.tokens or []:
+            if tk.start_ts is not None and any(c.isalnum() for c in tk.text):
+                words.append((round(offset + tk.start_ts, 3), tk.text))
+        chunks.append(audio)
+        offset += len(audio) / 24000
+    pcm = (np.clip(np.concatenate(chunks), -1, 1) * 32767).astype("<i2").tobytes()
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "s16le", "-ar", "24000", "-ac", "1", "-i", "-",
+                    "-b:a", "64k", str(mp3_path)], input=pcm, check=True)
+    return words
 
 
 def split_marks(raw):
@@ -157,7 +195,9 @@ async def main(src, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     cache_path = Path(src).with_suffix(".timings.json")  # build cache, kept out of the site
     cache = json.loads(cache_path.read_text(encoding="utf-8-sig")) if cache_path.exists() else {}
-    voice, rate = spec["voice"], spec["rate"]
+    voice, rate, engine = spec["voice"], spec["rate"], spec.get("engine", "edge")
+    if engine not in ("edge", "kokoro"):
+        raise SystemExit(f"unknown engine {engine!r}: use edge or kokoro")
     result = {}
     public = lambda v: {k: v[k] for k in ("dur", "marks", "cues")}
     live = {b: public(v) for b, v in cache.items()
@@ -167,11 +207,12 @@ async def main(src, out_dir):
         mp3 = out_dir / f"{beat}.mp3"
         old = cache.get(beat)
         clean, marks = split_marks(raw)
-        key = hashlib.sha1(f"{voice}|{rate}|{clean}".encode()).hexdigest()
+        tag = "" if engine == "edge" else f"{engine}|"   # Edge keys stay as they were, so its audio is kept
+        key = hashlib.sha1(f"{tag}{voice}|{rate}|{clean}".encode()).hexdigest()
         # Existing caches included [[marks]] in the key; reuse an unchanged old beat once,
         # then save its spoken-text key so future mark edits do not regenerate audio.
         legacy_key = hashlib.sha1(f"{voice}|{rate}|{raw}".encode()).hexdigest()
-        reusable = old and old.get("key") in (key, legacy_key) and "words" in old and mp3.exists() and mp3.stat().st_size > 0
+        reusable = old and old.get("key") in (key, legacy_key if engine == "edge" else key) and "words" in old and mp3.exists() and mp3.stat().st_size > 0
         tmp = None
         if reusable:
             words = old["words"]
@@ -182,10 +223,8 @@ async def main(src, out_dir):
             clip = tmp
         try:
             if not reusable:
-                try:
-                    words = await synth_with_retries(beat, clean, voice, rate, clip)
-                except NoAudioReceived:
-                    raise SystemExit(await explain_no_audio(beat, voice, rate, out_dir)) from None
+                words = (kokoro_beat(clean, voice, rate, clip) if engine == "kokoro"
+                         else await edge_beat(beat, clean, voice, rate, clip, out_dir))
             entry = {"key": key, "dur": duration(clip), "words": words,
                      "marks": mark_times(clean, marks, words), "cues": caption_cues(clean, words)}
             if tmp:
@@ -207,4 +246,7 @@ async def main(src, out_dir):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print(__doc__)
+        sys.exit(0 if sys.argv[1:] in (["-h"], ["--help"]) else 2)
     asyncio.run(main(*sys.argv[1:3]))

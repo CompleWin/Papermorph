@@ -2,7 +2,9 @@
 
 A chapter page loads the engine and its `audio/<lang>/timings.js`, defines `CHAPTER` (including `language` when different from `en`), drawing helpers, `BEATS` and questions, then calls `boot()`. The engine provides the stage, drawing, timeline, question types, guide and player. Use the code's signatures if they differ from this reference.
 
-Many helpers are mathematical because the first book was algebra. Use those that fit, implement new ones in the chapter as needed, and share them in the book's engine when another chapter uses them.
+Every book keeps a copy of the shared engine in `lib/` (`engine.*`, `volume.*`), so the book runs on its own. The engine is not part of this skill: it lives in the `engine/` folder of the Papermorph repository (or a fork), versioned by tags. `python3 SKILL/scripts/engine.py site` copies it into every book (`--check` lists copies that differ, `--from DIR|OWNER/REPO@REF` picks the source); a book's copy is not edited by hand. An engine bug is fixed at the source, then synced. The book's own settings and style overrides live in `lib/book.css`, imported by `engine.css` and never overwritten: `--math-font` for numbers and formulas, `--progress-key` when the cover uses a key other than the default.
+
+Many drawing helpers are mathematical because the first book was algebra. Use those that fit; draw the rest in the chapter, and move what several chapters use into the book's element library (`lib/<name>.js`, [assets.md](assets.md)) rather than into the engine copy.
 
 ## Stage and state
 
@@ -10,7 +12,7 @@ Many helpers are mathematical because the first book was algebra. Use those that
 - Every animated element carries a state object written to the DOM by `render()`: `x y` (translate), `s` (scale), `r` (rotate, degrees), `o` (opacity), `d` (stroke drawn, 0–1), `a_<attr>` (numeric attribute, e.g. `'a_stroke-width'`), `c_<attr>` (hex colour). Give a key a starting value before tweening it; an `a_`/`c_` key without one starts from the element's attribute.
 - Scale and rotation are about the element's own origin: draw around (0,0) and place with `x/y`.
 - `S` holds objects shared across beats (`S.panel`, `S.line`, …). `reset()` clears it, so anything a later beat needs must be stored on `S`.
-- Palette `COL`: `chalk dim faint task good bad board` plus six hues `nat whole int rat irr real`. Fonts: `UI` (text), `MATH` (serif).
+- Palette `COL`: `chalk dim faint task good bad board` plus six hues named `nat whole int rat irr real` (from the algebra book; give them the book's own meanings in `style.json` `look.meaning`, e.g. `const FORCE = COL.…`). Fonts: `UI` (text), `MATH` (serif unless the book's `--math-font` says otherwise).
 
 ## Drawing
 
@@ -34,7 +36,7 @@ Topic helpers already in the engine: number lines (`numberLine`, `X(v)`, `Y0`, `
 
 ## LaTeX
 
-A book whose formulas need more than `M()` parts (indices, sums, matrices, accents) uses the vendored MathJax: copy it when starting the book ([site.md](site.md#start-a-book-folder)) and load `<script src="../lib/mathjax.js"></script>` right after `engine.js` in every chapter.
+A book whose formulas need more than `M()` parts (indices, sums, matrices, accents) uses the engine's vendored MathJax: add it with `engine.py <book> --latex` ([site.md](site.md#start-a-book-folder)) and load `<script src="../lib/mathjax.js"></script>` right after `engine.js` in every chapter.
 
 - `TX('\\frac{a}{b}')` is a part like `F()`: it works in `M`, `tokens`, `chip`, `eqLine` (also as `sym`), `mathEl`, `blanks` and `grid`; `$tex(tex)` puts one in HTML text. 1 em is `size`; the baseline is at `y`.
 - Formulas are set in text style, like `$…$`; write `\displaystyle` for large sums and fractions. Words go in `\text{…}` and use the book's math font.
@@ -52,11 +54,35 @@ A book whose formulas need more than `M()` parts (indices, sums, matrices, accen
 ```
 
 - `m('name', offset)` is the start time of the word after `[[name]]`; `D` is the clip's length. Use marks for actions tied to speech; scene entrances and transitions can use fixed offsets.
-- Tweens: `tw(e, to, t0, dur, ease)`, `prog(q => …, t0, dur, ease)` for custom motion (arcs, counters, live redraws), `show`, `hide`, `draw`, `pop`, `pulse`, `stream`. Eases: `io`, `out`, `back`, `lin`.
+- Tweens: `tw(e, to, t0, dur, ease)`, `prog(q => …, t0, dur, ease)` for custom motion (arcs, counters, live redraws), `show`, `hide`, `draw`, `pop`, `pulse`, `stream`. Eases: `io`, `out`, `back`, `lin`, `soft`. Continuous motion and cameras: see below.
 - A lesson beat ends after its narration and its last tween, then the next starts; an `ask` beat waits for `done()`.
 - **Opening lead-in**: if a beat calls `panel()` (before 0.5 s) and nothing appears within 0.8 s, `runBeat` moves the opening group (every tween starting within 1.2 s of the first reveal) to start at 0.4 s. Opt out with `{ lead: false }` in the beat's fourth slot.
 - **Seeking replays**: jumping to beat N rebuilds the scene and runs earlier beats instantly. Make `run` deterministic: create objects and schedule tweens through the timeline, with inputs from chapter data and replayed `S` state. Create interactions inside `ask`; use `fx`/`fxp` for answer effects.
 - Constants used in a `BEATS` literal are evaluated when it is defined, so define them above `BEATS`. Data used only inside an `ask` closure may sit below.
+
+## World clock and camera
+
+For continuous motion (vehicles, orbits, rolling, scrolling scenery) and camera work. Everything is a pure function of the beat time, so pause, seek and `?beat=N&t=S` show the same frame.
+
+- `clockRun(f, D)` calls `f(t)` on every frame of the beat, `t` in seconds from its start (0..D). Write positions as functions of `t` (`x = x0 + v * t`) and share them between objects and the camera; never accumulate per-frame state.
+- `const cam = camera(parent, D, { x, y, z, r, box, bg })` makes a view onto a world group. Draw in `cam.world` in world coordinates. The view `{x, y}` is the world point shown at the centre, `z` the zoom (screen px per world px), `r` the roll in degrees. Defaults: full stage, `(800, 450)`, `z` 1 (identity, so stage coordinates still work). With `box: [x, y, w, h]` the camera draws in a framed, clipped box with background `bg` (split screen, picture-in-picture); its default zoom fits the 1600 × 900 world into the box. `cam.el` is the camera's group (fade, pop or hide it; it scales about the box centre).
+- Moves, all on the beat clock: `cam.to({x, y, z, r}, t0, dur = 1, ease = soft)` blends only the keys given, from wherever the camera is at `t0`; `cam.cut(view, t0)` is a hard cut (`dur` 0); `cam.shake(amp, t0, dur, hz = 7)` is a subtle, repeatable shake (fades in and out over 0.3 s). Any key may be a function of `t`: that is a follow shot (`cam.to({ x: t => carX(t) }, 2, 1.5)` locks on over 1.5 s; `r: t => spin(t)` rolls with a rotating object). Zoom changes evenly (log scale) and keeps one world point fixed when start and end allow it.
+- Parallax: `cam.layer(k, wrap)` returns a group inside the world that moves at `k` × the camera's pan (`k` < 1 far, > 1 near; zoom and roll are not scaled per layer). With `wrap = W` the layer's content repeats every `W` world px: draw one period plus the widest view, and the camera can pan any distance. Keep repeating details (dashes, tiles, trees) on a period that divides `W`, and move followed objects by multiples of `W` when they loop, so the loop is invisible.
+- `cam.at(t)` returns the view at `t`; `cam.screen(wx, wy, t)` the screen position of a world point (no shake), for screen-space labels that track an object. `cam.track(label, wx, wy, t)` does that for a text label drawn outside the camera: it follows the point, stays inside the frame (or box), and fades out once the point leaves; fade it in through a wrapper group. Keep tracked labels in the safe frame this way rather than letting them clip at the edge.
+- Split screen or picture-in-picture: two cameras with boxes, each with its own copy of the world built by the same function and driven by the same clock functions. Cross-fade between shots by fading one camera's `el` out and another's in.
+- Labels drawn in the world scale with the zoom; put text that must stay readable in screen space (the panel) or give world labels a size for the shot's zoom. A beat whose camera shows a picture from its first frame while its first scheduled reveal is late may need `{ lead: false }`.
+- Ease `soft` (cosine in-out) suits camera moves; `io`, `out`, `back`, `lin` or any `p => …` work too.
+
+## Performance (Firefox)
+
+Firefox repaints SVG on the main thread and is the slowest common browser for these pages. Measure in Playwright Firefox as well as Chromium: rAF frame times at beat transitions and during camera moves. Headless Chromium hides paint cost.
+
+- Never put an SVG filter behind animated content (the stage grain is a static CSS texture for this reason). Avoid clip-paths on moving or zooming groups where a box or an image does the job.
+- Large shapes under a big camera zoom or roll are expensive: a filled `<circle>` scaled 6× and rotating cost about 200 ms a frame in Firefox, while the same picture as one `<image>` cost about 3 ms. Prefer one image for a big detailed object (a planet, a map), and few elements over many small ones (merge cells into one path per colour, or use an image).
+- Write per-frame attributes and text only when they change (`render()` already skips unchanged transform and opacity). Old panels are set to `display: none` after their fade.
+- Pixel-art sprites: draw `<image>` with `style="image-rendering: pixelated"` at an integer scale, and pre-scale the file (nearest neighbour) so it stays crisp where the style is ignored.
+- Cross-fading two full-screen cameras costs a long frame: fade only the incoming one in over the outgoing one, then hide the old.
+- A question card's entrance after a busy scene can hitch; measure it with `perf.py`.
 
 ## Questions
 
@@ -64,7 +90,7 @@ A book whose formulas need more than `M()` parts (indices, sums, matrices, accen
 quiz(position, [{ id: 'c-mean', prompt: ['Find the mean of ', $m('7, 3, 9'), '.'], build: blanks([...]) }, …], done, 'Quick check')
 ```
 
-- Positions: `BAND` (below a number line, y 686–886), `TOPR` (top right, ≤ 470 high), `RIGHT`, `SCREEN` (full-screen practice; label `'Chapter practice   N of M'`), `SORT_SCREEN`, or any `{x, y, w, cls: 'side'}`.
+- Positions: `BAND` (bottom band, y 686–886; long content can push it past the stage, so check it), `TOPR` (top right, ≤ 470 high), `RIGHT`, `SCREEN` (full-screen practice; label `'Chapter practice   N of M'`), `SORT_SCREEN`, or any `{x, y, w, cls: 'side'}`.
 - `choice(options, right, why, wrongWhys[], onRight?)` — number keys.
 - `blanks(rows)` — rows `{parts: [..., {box: '21'}, ...], why, hint?, fx?, test?}`; accepts −5, 3/4, 2 1/4, 0.75 as exact values; `{box, lowest: true}` demands lowest terms; `test(values)` judges the whole row (e.g. two factors in either order). Tab moves between boxes, Enter checks, Esc leaves a box.
 - `grid(rows, cols, {multi, text})` — rows `{parts, ans: [keys], why, fx?}`, cols `[[key, label, colour?, hotkey?]]`; with `text: true` parts are rich text (math via `$m`). ↑/↓ change rows.
@@ -75,9 +101,9 @@ quiz(position, [{ id: 'c-mean', prompt: ['Find the mean of ', $m('7, 3, 9'), '.'
 
 ## Player
 
-Space play/pause, ←/→ previous/next beat (Shift+←/→ during a question), Home restart, C captions, F full screen, ? help. `seek(i, play)` rebuilds and jumps; `start(i, play)` begins a beat from the current picture. While audio plays, the beat clock follows `audio.currentTime`. `?beat=N&t=S` in the URL opens a frozen frame for review. The finish card's Enter opens `CHAPTER.next`, R replays.
+Space play/pause, ←/→ previous/next beat (Shift+←/→ during a question), Home restart, C captions, `<`/`>` speed (0.75–1.5×, remembered), F full screen, ? help. Clicking a step segment jumps to that point of the beat (`seekInto(i, frac)`); the next beat's clip preloads while one plays. `seek(i, play)` rebuilds and jumps; `start(i, play)` begins a beat from the current picture. While audio plays, the beat clock follows `audio.currentTime`. `?beat=N&t=S` in the URL opens a frozen frame for review. The finish card's Enter opens `CHAPTER.next`, R replays.
 
-Progress uses the stable legacy key `animebook:progress:<book-path>` (keep it when renaming the project so existing readers retain their progress); the cover template reads the same key. Books served in different folders have separate saved places and completion lists.
+Progress uses the stable legacy key `animebook:progress:<book-path>` (keep it when renaming the project so existing readers retain their progress); the cover template reads the same key. A book can set another key with `--progress-key` in `lib/book.css`; its cover must then read that key. Books served in different folders have separate saved places and completion lists.
 
 Treat saved progress as optional: malformed JSON, `null` or a non-object value starts with empty progress; only an array of positive integer chapter numbers is used for completion. Preserve each existing book's key when applying engine fixes.
 
@@ -96,7 +122,7 @@ Keep `<link rel="expect" href="#bar" blocking="render">` in every chapter's head
 - Prompts, `grid` text rows and `choice` options are HTML: plain strings render as text, so wrap math in `$m(...)`.
 - In a JS string, double each TeX backslash (`'\\frac{a}{b}'`) or use `` String.raw`\frac{a}{b}` ``: `'\text'` is a tab followed by "ext".
 - Write a formula wholly in TeX, an `eqLine` sign included (`sym: TX('\\le')`): TeX glyphs are smaller and lighter than `M()` text.
-- Prefix chapter-specific helpers when their names might collide with engine globals (`rect`, `popIn`, `eqLine`, `fit`, `slot`, `Y0`, …); a redeclaration stops the page script.
+- Prefix chapter-specific helpers when their names might collide with engine globals (`rect`, `popIn`, `eqLine`, `fit`, `slot`, `Y0`, `OV`, `camera`, `soft`, `clockRun`, `retire`, `seeking`, `BOOK`, `bookSetting`, `TX`, `texPart`, …); a redeclaration stops the page script. `lint.py` lists every clash.
 - Drag handling: re-parent (append) the element before `setPointerCapture`; moving a node drops its capture.
 - A card whose content is too long for `BAND` should become several `blanks` rows in a wider side card.
 - A `grid` needs a card at least 560 px wide: its rows keep a 170 px column for the item, so in `RIGHT` (330 px) the option buttons overflow, sooner with longer translated labels.

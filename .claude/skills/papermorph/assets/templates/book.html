@@ -164,6 +164,9 @@ main#contents { padding-bottom: 80px; }
 
 /* ---------- page-to-page motion ---------- */
 @view-transition { navigation: auto; }
+/* Firefox flickers through view transitions (the header blinks for several frames): it switches without one, and the
+   contents still rise in. -moz-orient exists only in Firefox. */
+@supports (-moz-orient: inline) { @view-transition { navigation: none; } }
 ::view-transition-group(*) { animation-duration: .5s; animation-timing-function: var(--ease); }
 ::view-transition-old(lesson), ::view-transition-new(lesson) { height: 100%; object-fit: cover; }
 ::view-transition-old(lesson) { animation-duration: .18s; }
@@ -220,7 +223,7 @@ main#contents { padding-bottom: 80px; }
 const TRANSLATIONS = {
   en: {
     open: 'Open the book', toCover: 'Back to the cover', resume: 'Continue · Chapter {n}', unit: 'Unit {n}', minutes: '{n} min',
-    meta: '{chapters} · {units} · with sound', metaChapters: '{n} chapters', metaUnits: '{n} units',
+    meta: '{chapters} · {units} · with sound', metaChapters: { one: '{n} chapter', other: '{n} chapters' }, metaUnits: { one: '{n} unit', other: '{n} units' },
     chapterCount: { one: '{n} chapter', other: '{n} chapters' }, finished: '{done} of {n} finished',
     doneMark: '✓ Finished · ', lastMark: ' · Last opened',
   },
@@ -249,8 +252,10 @@ for (const element of document.querySelectorAll('[data-t-label]')) element.setAt
 document.documentElement.style.setProperty('--done', JSON.stringify(translate('doneMark')));
 document.documentElement.style.setProperty('--last', JSON.stringify(translate('lastMark')));
 
-// Chapters are numbered in order through the units. Add a chapter here when its lesson is ready.
-const UNITS = [   // [unit title, [[chapter title, minutes], ...]]; chapters are numbered in order. Add a chapter when its lesson is ready.
+// Units and chapters are numbered in order from START (a book whose scope starts mid-way keeps the original numbers).
+// Add a chapter here when its lesson is ready.
+const START = { unit: 1, chapter: 1 };
+const UNITS = [   // [unit title, [[chapter title, minutes], ...]]
   ['First unit', [['First chapter', 8]]],
 ];
 const HUES = ['#f4a48c', '#86c9e8', '#f3c95c', '#e8a0c8', '#8fd6b0', '#bba8ee', '#f0b45a'];
@@ -264,20 +269,19 @@ try {
 const done = new Set(Array.isArray(P.done) ? P.done.filter(n => Number.isInteger(n) && n > 0) : []);
 
 // Contents.
-let n = 0, total = 0, i = 0;   // i staggers the entrance, in reading order
+let n = START.chapter - 1, total = 0, i = 0;   // i staggers the entrance, in reading order
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 document.getElementById('units').innerHTML = UNITS.map(([name, chs], u) => {
-  return `<section class="unit" style="--c:${HUES[u % HUES.length]};--i:${i++}"><svg class="unit-art" viewBox="0 0 600 180" aria-hidden="true">${UNIT_ART[u] || ''}</svg><h2><span>${translate('unit', { n: u + 1 })}</span>${esc(name)}</h2><div class="grid">` +
-    chs.map(([t, min]) => { n++;
+  return `<section class="unit" style="--c:${HUES[u % HUES.length]};--i:${i++}"><svg class="unit-art" viewBox="0 0 600 180" aria-hidden="true">${UNIT_ART[u] || ''}</svg><h2><span>${translate('unit', { n: u + START.unit })}</span>${esc(name)}</h2><div class="grid">` +
+    chs.map(([t, min]) => { n++; total++;
       const cls = 'ch' + (done.has(n) ? ' done' : '') + (P.last === n ? ' last' : '');
       return `<a class="${cls}" id="${id(n)}" href="${id(n)}/" style="--i:${i++}"><b>${n}</b><span>${esc(t)}</span><small>${translate('minutes', { n: min })}</small></a>`;
     }).join('') + '</div></section>';
 }).join('');
-total = n;
 // A unit's sketch draws itself the first time the unit scrolls into view.
 const seen = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('seen'); seen.unobserve(e.target); } }), { threshold: .25 });
 document.querySelectorAll('.unit').forEach(u => seen.observe(u));
-const finished = [...done].filter(k => k <= total).length;
+const finished = [...done].filter(k => k >= START.chapter && k <= n).length;
 document.getElementById('prog').innerHTML = finished ? translate('finished', { done: `<b>${finished}</b>`, n: total }) : translate('chapterCount', { n: total });
 document.getElementById('meta').textContent = translate('meta', {
   chapters: translate('metaChapters', { n: total }), units: translate('metaUnits', { n: UNITS.length }) });
@@ -325,7 +329,7 @@ function show(animate) {
       heading?.focus({ preventScroll: true });
     }
   };
-  if (animate && document.startViewTransition && !reduced) {
+  if (animate && document.startViewTransition && !reduced && !CSS.supports('-moz-orient', 'inline')) {
     const transition = document.startViewTransition(apply);
     // Navigation can interrupt either promise; the new view is already applied.
     transition.ready.catch(() => {});

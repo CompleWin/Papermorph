@@ -172,6 +172,9 @@ main#contents { padding-bottom: 80px; }
 
 /* ---------- page-to-page motion ---------- */
 @view-transition { navigation: auto; }
+/* Firefox flickers through view transitions (the header blinks for several frames): it switches without one, and the
+   contents still rise in. -moz-orient exists only in Firefox. */
+@supports (-moz-orient: inline) { @view-transition { navigation: none; } }
 ::view-transition-group(*) { animation-duration: .5s; animation-timing-function: var(--ease); }
 ::view-transition-old(lesson), ::view-transition-new(lesson) { height: 100%; object-fit: cover; }
 ::view-transition-old(lesson) { animation-duration: .18s; }
@@ -320,7 +323,7 @@ function show(animate) {
       heading?.focus({ preventScroll: true });
     }
   };
-  if (animate && document.startViewTransition && !reduced) {
+  if (animate && document.startViewTransition && !reduced && !CSS.supports('-moz-orient', 'inline')) {
     const transition = document.startViewTransition(apply);
     // Navigation can interrupt either promise; the new view is already applied.
     transition.ready.catch(() => {});

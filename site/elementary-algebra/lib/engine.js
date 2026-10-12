@@ -3,65 +3,163 @@
 'use strict';
 // A fast follow-up navigation can abort the incoming page transition.
 addEventListener('pagereveal', e => e.viewTransition?.ready.catch(() => {}));
+
+/* ---------- interface language ---------- */
+// The page's <html lang> picks the interface text; CHAPTER.language picks the audio folder. Set both alike.
+// A value is a string or plural forms { one, few, many, other } chosen by vars.n. Missing keys fall back to English.
+const TRANSLATIONS = {
+  en: {
+    decimalSign: '.', stageLabel: 'Lesson animation', stageLabelTitled: 'Lesson animation: {title}',
+    shortcuts: 'Keyboard shortcuts', lesson: 'Lesson', questions: 'Questions',
+    helpPlay: 'Play or pause', helpStep: 'Previous or next step', helpStepInQuestion: 'Change step during a question', helpRestart: 'Start over',
+    helpCaptions: 'Captions on or off', helpSpeed: 'Slower or faster', helpFullScreen: 'Full screen', helpList: 'Show this list',
+    helpChoose: 'Choose an answer or a ring', helpTrueFalse: 'True or false', helpRows: 'Move between rows',
+    helpNumberLine: 'Move along the number line, or pick a number to sort', helpEnter: 'Check, then continue',
+    helpShowAnswer: 'Show the answer', helpLeaveBox: 'Leave an answer box', helpClose: 'Press {key} to close.',
+    paused: 'Paused. Press space or click to continue.',
+    soundFailed: 'Sound could not play. The lesson continues with the on-screen text.',
+    startLesson: 'Start lesson', coverKeys: 'Press {space} to start, {help} for shortcuts.', spaceKey: 'Space',
+    chapterNumber: 'Chapter {n}', aboutMinutes: 'About {n} minutes, with sound and quick checks.',
+    allChapters: 'All chapters', playLabel: 'Play or pause (space)', backLabel: 'Previous step (left arrow)', restartLabel: 'Restart lesson',
+    volumeLabel: 'Adjust volume', volumeTitle: 'Volume (0 = muted)', volumeSlider: 'Volume',
+    helpLabel: 'Keyboard shortcuts (?)', speedLabel: 'Playback speed (< and >)', captionsLabel: 'Captions (C)', fullScreenLabel: 'Full screen', goToStep: 'Go to step {n}: {title}',
+    quickCheck: 'Quick check', countOf: '{k} of {n}', check: 'Check', showAnswer: 'Show answer', nextQuestion: 'Next question', continue: 'Continue',
+    correct: 'Correct. ', notQuite: 'Not quite. ', answerPrefix: 'Answer: ', keysPrefix: 'Keys: ',
+    hintMove: ' move, ', hintChoose: ' choose', hintChooseOrClickGrid: ' choose, or click the grid', hintMoveAlongLine: ' move along the line, ',
+    hintChooseOrClick: ' choose, or click', hintRow: ' row, ', hintTypeFraction: 'type numbers like 3/4 or −2 1/4, ', hintTypeNumber: 'type the number, ',
+    hintTypeDecimal: 'type the number, ', hintNextBox: ' next box, ', hintCheck: ' check, ', hintLeaveBox: ' leave the box',
+    hintPickNumber: ' pick a number, ', hintPickRing: ' choose its ring',
+    rowsRight: '{r} of {n} right. Fix the rows marked ✗ and check again.',
+    choicesShown: 'the correct choices are now selected.', numbersShown: 'the correct numbers are filled in.',
+    notPlacedYet: '{x} is not placed yet.',
+    realRingIsEmpty: '{x}: every real number is rational or irrational, so that space has no numbers of its own.',
+    ringsRight: '{r} of {n} in the right ring.', ringsShown: 'every number is now in its smallest ring.',
+    chipPlaced: '{x}, placed in {ring}', chipNotPlaced: '{x}, not placed', pointLabel: 'The point {v}', answerBox: 'Answer',
+    stepsLeftOfZero: '{n} steps left of 0',
+    natural: 'Natural', whole: 'Whole', integers: 'Integers', rational: 'Rational', irrational: 'Irrational', real: 'Real', integerColumn: 'Integer',
+    trueLabel: 'True', falseLabel: 'False',
+    chapterComplete: 'Chapter {n} complete', quickChecks: 'Quick checks', chapterPractice: 'Chapter practice',
+    firstTryScore: '{name}: {r} of {t} right on the first try.', notAttempted: '{name}: not attempted.',
+    watchAgain: 'Watch again', nextChapter: 'Next chapter',
+  },
+  ru: {
+    decimalSign: ',', stageLabel: 'Анимация урока', stageLabelTitled: 'Анимация урока: {title}',
+    shortcuts: 'Горячие клавиши', lesson: 'Урок', questions: 'Вопросы',
+    helpPlay: 'Пуск или пауза', helpStep: 'Предыдущий или следующий шаг', helpStepInQuestion: 'Сменить шаг во время вопроса', helpRestart: 'Начать сначала',
+    helpCaptions: 'Субтитры вкл. или выкл.', helpSpeed: 'Медленнее или быстрее', helpFullScreen: 'Полноэкранный режим', helpList: 'Показать этот список',
+    helpChoose: 'Выбрать ответ или круг', helpTrueFalse: 'Верно или неверно', helpRows: 'Перейти между строками',
+    helpNumberLine: 'Двигаться по числовой прямой или выбрать число для сортировки', helpEnter: 'Проверить, затем продолжить',
+    helpShowAnswer: 'Показать ответ', helpLeaveBox: 'Выйти из поля ответа', helpClose: 'Нажмите {key}, чтобы закрыть.',
+    paused: 'Пауза. Нажмите пробел или щёлкните, чтобы продолжить.',
+    soundFailed: 'Звук не воспроизводится. Урок продолжится с текстом на экране.',
+    startLesson: 'Начать урок', coverKeys: '{space} — начать, {help} — горячие клавиши.', spaceKey: 'Пробел',
+    chapterNumber: 'Глава {n}',
+    aboutMinutes: { one: 'Около {n} минуты, со звуком и проверками.', few: 'Около {n} минут, со звуком и проверками.',
+      many: 'Около {n} минут, со звуком и проверками.', other: 'Около {n} минуты, со звуком и проверками.' },
+    allChapters: 'Все главы', playLabel: 'Пуск или пауза (пробел)', backLabel: 'Предыдущий шаг (стрелка влево)', restartLabel: 'Начать урок заново',
+    volumeLabel: 'Настроить громкость', volumeTitle: 'Громкость (0 — без звука)', volumeSlider: 'Громкость',
+    helpLabel: 'Горячие клавиши (?)', speedLabel: 'Скорость воспроизведения (< и >)', captionsLabel: 'Субтитры (C)', fullScreenLabel: 'Полный экран', goToStep: 'Перейти к шагу {n}: {title}',
+    quickCheck: 'Проверь себя', countOf: '{k} из {n}', check: 'Проверить', showAnswer: 'Показать ответ', nextQuestion: 'Следующий вопрос', continue: 'Продолжить',
+    correct: 'Верно. ', notQuite: 'Не совсем. ', answerPrefix: 'Ответ: ', keysPrefix: 'Клавиши: ',
+    hintMove: ' двигаться, ', hintChoose: ' выбрать', hintChooseOrClickGrid: ' выбрать или щёлкнуть по сетке', hintMoveAlongLine: ' двигаться по прямой, ',
+    hintChooseOrClick: ' выбрать или щёлкнуть', hintRow: ' строка, ', hintTypeFraction: 'вводите числа вида 3/4 или −2 1/4, ', hintTypeNumber: 'введите число, ',
+    hintTypeDecimal: 'вводите числа вида 0,75, ', hintNextBox: ' следующее поле, ', hintCheck: ' проверить, ', hintLeaveBox: ' выйти из поля',
+    hintPickNumber: ' выбрать число, ', hintPickRing: ' выбрать его круг',
+    rowsRight: 'Верно {r} из {n}. Исправьте строки с ✗ и проверьте снова.',
+    choicesShown: 'правильные варианты отмечены.', numbersShown: 'правильные числа вписаны.',
+    notPlacedYet: '{x}: ещё не размещено.',
+    realRingIsEmpty: '{x}: каждое действительное число рационально или иррационально, поэтому своих чисел у этой области нет.',
+    ringsRight: 'В нужном круге: {r} из {n}.', ringsShown: 'каждое число теперь в своём наименьшем круге.',
+    chipPlaced: '{x}, в круге «{ring}»', chipNotPlaced: '{x}, не размещено', pointLabel: 'Точка {v}', answerBox: 'Ответ',
+    stepsLeftOfZero: { one: '{n} шаг влево от 0', few: '{n} шага влево от 0', many: '{n} шагов влево от 0', other: '{n} шага влево от 0' },
+    natural: 'Натуральные', whole: 'Целые неотрицательные', integers: 'Целые', rational: 'Рациональные', irrational: 'Иррациональные', real: 'Действительные', integerColumn: 'Целые',
+    trueLabel: 'Верно', falseLabel: 'Неверно',
+    chapterComplete: 'Глава {n} пройдена', quickChecks: 'Проверь себя', chapterPractice: 'Практика по главе',
+    firstTryScore: '{name}: {r} из {t} верно с первой попытки.', notAttempted: '{name}: не выполнялось.',
+    watchAgain: 'Смотреть снова', nextChapter: 'Следующая глава',
+  },
+};
+const LANGUAGE = (document.documentElement.lang || 'en').toLowerCase().split('-')[0];
+const pluralRules = {};
+// Interface text in LANGUAGE: translate('chapterNumber', { n: 3 }) → 'Chapter 3'. Chapters may use it too, e.g. for practice labels.
+function translate(key, vars = {}) {
+  const language = TRANSLATIONS[LANGUAGE]?.[key] !== undefined ? LANGUAGE : 'en';
+  let text = TRANSLATIONS[language][key] ?? key;
+  if (typeof text === 'object') {
+    try { pluralRules[language] ??= new Intl.PluralRules(language); } catch { pluralRules[language] = new Intl.PluralRules('en'); }
+    text = text[pluralRules[language].select(vars.n)] ?? text.other;
+  }
+  return text.replace(/\{(\w+)\}/g, (placeholder, name) => name in vars ? vars[name] : placeholder);
+}
+const DECIMAL_SIGN = translate('decimalSign');   // shown by num() and accepted by answer boxes
+const isLatinLetter = key => /^[a-z]$/i.test(key);
+// A letter shortcut on any keyboard layout: the typed letter, or the same physical key when the layout types a non-Latin letter.
+const isShortcut = (event, letter) => event.key.toLowerCase() === letter.toLowerCase()
+  || (isLatinLetter(letter) && !isLatinLetter(event.key) && event.code === 'Key' + letter.toUpperCase());
+// A punctuation shortcut (code 'Comma', 'Period') on a layout that types a non-Latin letter on that key.
+const isShortcutCode = (event, code) => /^\p{L}$/u.test(event.key) && !isLatinLetter(event.key) && event.code === code;
+
 document.body.insertAdjacentHTML('afterbegin', `<div id="frame">
-  <svg id="stage" viewBox="0 0 1600 900" role="img" aria-label="Lesson animation">
+  <svg id="stage" viewBox="0 0 1600 900" role="img" aria-label="${translate('stageLabel')}">
     <g id="scene"></g>
   </svg>
   <div id="ui"></div>
-  <div class="paused-mark"><div>Paused. Press space or click to continue.</div></div>
+  <div class="paused-mark"><div>${translate('paused')}</div></div>
   <div class="caption" id="caption" hidden></div>
-  <div class="help" id="help" hidden role="dialog" aria-label="Keyboard shortcuts">
+  <div class="help" id="help" hidden role="dialog" aria-label="${translate('shortcuts')}">
     <div class="help-box">
-      <h2>Keyboard shortcuts</h2>
+      <h2>${translate('shortcuts')}</h2>
       <div class="help-cols">
-        <div><h3>Lesson</h3><dl>
-          <dt><kbd>Space</kbd></dt><dd>Play or pause</dd>
-          <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>Previous or next step</dd>
-          <dt><kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd></dt><dd>Change step during a question</dd>
-          <dt><kbd>Home</kbd></dt><dd>Start over</dd>
-          <dt><kbd>C</kbd></dt><dd>Captions on or off</dd>
-          <dt><kbd>F</kbd></dt><dd>Full screen</dd>
-          <dt><kbd>?</kbd></dt><dd>Show this list</dd>
+        <div><h3>${translate('lesson')}</h3><dl>
+          <dt><kbd>${translate('spaceKey')}</kbd></dt><dd>${translate('helpPlay')}</dd>
+          <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>${translate('helpStep')}</dd>
+          <dt><kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd></dt><dd>${translate('helpStepInQuestion')}</dd>
+          <dt><kbd>Home</kbd></dt><dd>${translate('helpRestart')}</dd>
+          <dt><kbd>C</kbd></dt><dd>${translate('helpCaptions')}</dd>
+          <dt><kbd>&lt;</kbd><kbd>&gt;</kbd></dt><dd>${translate('helpSpeed')}</dd>
+          <dt><kbd>F</kbd></dt><dd>${translate('helpFullScreen')}</dd>
+          <dt><kbd>?</kbd></dt><dd>${translate('helpList')}</dd>
         </dl></div>
-        <div><h3>Questions</h3><dl>
-          <dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>Choose an answer or a ring</dd>
-          <dt><kbd>T</kbd><kbd>F</kbd></dt><dd>True or false</dd>
-          <dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>Move between rows</dd>
-          <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>Move along the number line, or pick a number to sort</dd>
-          <dt><kbd>Enter</kbd></dt><dd>Check, then continue</dd>
-          <dt><kbd>S</kbd></dt><dd>Show the answer</dd>
-          <dt><kbd>Esc</kbd></dt><dd>Leave an answer box</dd>
+        <div><h3>${translate('questions')}</h3><dl>
+          <dt><kbd>1</kbd>–<kbd>6</kbd></dt><dd>${translate('helpChoose')}</dd>
+          <dt><kbd>T</kbd><kbd>F</kbd></dt><dd>${translate('helpTrueFalse')}</dd>
+          <dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>${translate('helpRows')}</dd>
+          <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>${translate('helpNumberLine')}</dd>
+          <dt><kbd>Enter</kbd></dt><dd>${translate('helpEnter')}</dd>
+          <dt><kbd>S</kbd></dt><dd>${translate('helpShowAnswer')}</dd>
+          <dt><kbd>Esc</kbd></dt><dd>${translate('helpLeaveBox')}</dd>
         </dl></div>
       </div>
-      <p class="help-close">Press <kbd>Esc</kbd> to close.</p>
+      <p class="help-close">${translate('helpClose', { key: '<kbd>Esc</kbd>' })}</p>
     </div>
   </div>
-  <p class="sound-note" id="soundNote" hidden>Sound could not play. The lesson continues with the on-screen text.</p>
+  <p class="sound-note" id="soundNote" hidden>${translate('soundFailed')}</p>
   <button class="cover" id="cover"><div>
     <p class="cover-k" id="coverK"></p>
     <h1 class="cover-t" id="coverT"></h1>
-    <span class="go"><svg width="24" height="24" viewBox="0 0 18 18"><path d="M3 1.5v15l13-7.5z" fill="currentColor"/></svg>Start lesson</span>
-    <small><span id="coverMeta"></span> Press <kbd>Space</kbd> to start, <kbd>?</kbd> for shortcuts.</small>
+    <span class="go"><svg width="24" height="24" viewBox="0 0 18 18"><path d="M3 1.5v15l13-7.5z" fill="currentColor"/></svg>${translate('startLesson')}</span>
+    <small><span id="coverMeta"></span> ${translate('coverKeys', { space: `<kbd>${translate('spaceKey')}</kbd>`, help: '<kbd>?</kbd>' })}</small>
   </div></button>
   <div id="bar">
-    <a class="icon" id="bHome" href="../" aria-label="All chapters" title="All chapters">
+    <a class="icon" id="bHome" href="../" aria-label="${translate('allChapters')}" title="${translate('allChapters')}">
       <svg viewBox="0 0 18 18"><path d="M2 2h6v6H2zM10 2h6v6h-6zM2 10h6v6H2zM10 10h6v6h-6z"/></svg>
     </a>
-    <button class="icon" id="bPlay" aria-label="Play or pause (space)">
+    <button class="icon" id="bPlay" aria-label="${translate('playLabel')}">
       <svg class="i-play" viewBox="0 0 18 18"><path d="M4 2v14l12-7z"/></svg>
       <svg class="i-pause" viewBox="0 0 18 18"><path d="M3.5 2h4v14h-4zM10.5 2h4v14h-4z"/></svg>
     </button>
-    <button class="icon" id="bBack" aria-label="Previous step (left arrow)">
+    <button class="icon" id="bBack" aria-label="${translate('backLabel')}">
       <svg viewBox="0 0 18 18"><path d="M3 2h2.5v14H3zM16 2v14L6.5 9z"/></svg>
     </button>
-    <button class="icon" id="bRestart" aria-label="Restart lesson">
+    <button class="icon" id="bRestart" aria-label="${translate('restartLabel')}">
       <svg viewBox="0 0 18 18"><path d="M9 2.5a6.5 6.5 0 1 1-6.3 8.1l2-.5A4.5 4.5 0 1 0 9 4.5V7L4.5 3.5 9 0z"/></svg>
     </button>
     <div class="segs" id="segs"></div>
     <div class="step" id="stepName"></div>
-    <button class="icon txt" id="bHelp" aria-label="Keyboard shortcuts (?)" title="Keyboard shortcuts (?)">?</button>
-    <button class="icon cc" id="bCC" aria-pressed="false" aria-label="Captions (C)" title="Captions (C)">CC</button>
-    <button class="icon" id="bFull" aria-label="Full screen">
+    <button class="icon txt" id="bHelp" aria-label="${translate('helpLabel')}" title="${translate('helpLabel')}">?</button>
+    <button class="icon txt speed" id="bSpeed" aria-label="${translate('speedLabel')}" title="${translate('speedLabel')}">1×</button>
+    <button class="icon cc" id="bCC" aria-pressed="false" aria-label="${translate('captionsLabel')}" title="${translate('captionsLabel')}">CC</button>
+    <button class="icon" id="bFull" aria-label="${translate('fullScreenLabel')}">
       <svg viewBox="0 0 18 18"><path d="M1 1h6v2H3v4H1zM11 1h6v6h-2V3h-4zM1 11h2v4h4v2H1zM15 11h2v6h-6v-2h4z"/></svg>
     </button>
   </div>
@@ -87,7 +185,7 @@ const UI = '"Avenir Next","Segoe UI","Helvetica Neue",Arial,sans-serif';
 const BOOK = getComputedStyle(document.documentElement);
 const bookSetting = name => BOOK.getPropertyValue(name).trim().replace(/^(["'])([^"']*)\1$/, '$2');   // unquote a lone string only
 const MATH = bookSetting('--math-font') || '"STIX Two Text","Cambria Math","Iowan Old Style",Palatino,Georgia,serif';
-const NAME = { nat: 'Natural', whole: 'Whole', int: 'Integers', rat: 'Rational', irr: 'Irrational', real: 'Real' };
+const NAME = { nat: translate('natural'), whole: translate('whole'), int: translate('integers'), rat: translate('rational'), irr: translate('irrational'), real: translate('real') };
 // Card positions inside the 1600×900 picture.
 const BAND = { x: 96, y: 686, w: 1408, cls: 'band' };      // bottom band (moves up when taller than the space left)
 const RIGHT = { x: 1258, y: 546, w: 330, cls: 'side', maxH: 346 };    // right of the number map
@@ -138,8 +236,51 @@ const VAR = /(?<![A-Za-z°])(?:(?!(?:of|in|is|to|or|at|on|by|as|an|if|it|be|no|s
 const F = (n, d) => ({ f: [String(n), String(d)] });   // fraction
 const R = (x, i) => ({ r: x && x.f ? x : String(x), i: i && String(i) });   // root of a number or of F(n, d); i = index, e.g. 3 for a cube root
 const E = x => ({ sup: String(x) });                    // exponent, raised after the part before it
+const TX = tex => ({ tex: String(tex) });               // LaTeX, drawn by MathJax; the book loads lib/mathjax.js right after this file
+const $tex = tex => $m(TX(tex));                        // LaTeX inline in HTML text
+// MathJax takes this object as its configuration when lib/mathjax.js loads after the engine.
+window.MathJax ??= {
+  startup: { typeset: false },                                   // no page scan; formulas are converted on demand
+  svg: { fontCache: 'none', mtextInheritFont: true },            // self-contained paths; \text{} in the book's math font
+  tex: { packages: { '[-]': ['noerrors', 'noundefined'] },       // a typo stops the page, like a misspelt mark
+         formatError: (_, error) => { throw error; } },
+  options: { enableMenu: false },
+};
+const TEX_CACHE = new Map();   // TeX source -> { graphic, viewBox }; seek() redraws every earlier beat
+// A copy of the formula's MathJax drawing: units of 1/1000 em, baseline at y = 0; viewBox is [x, y, width, height].
+function texGraphic(tex) {
+  let drawn = TEX_CACHE.get(tex);
+  if (!drawn) {
+    if (!window.MathJax?.tex2svg) throw new Error(`TX('${tex}') needs lib/mathjax.js: load ../lib/mathjax.js right after engine.js`);
+    if (!document.getElementById('MJX-SVG-styles')) document.head.append(MathJax.svgStylesheet());   // draws table rules and frames
+    let svg;
+    try { svg = MathJax.tex2svg(tex, { display: false, family: MATH }).querySelector('svg'); }   // family: \text{} is measured in the font it is drawn in
+    catch (error) { throw new Error(`TX('${tex}'): ${error.message}`); }
+    const graphic = mk('g');
+    graphic.append(...svg.childNodes);
+    drawn = { graphic, viewBox: svg.getAttribute('viewBox').split(' ').map(Number) };
+    TEX_CACHE.set(tex, drawn);
+  }
+  return { graphic: drawn.graphic.cloneNode(true), viewBox: drawn.viewBox };
+}
+// The part of a TeX formula marked \class{name}{...}, ready for tw/fx on c_color and o.
+// MathJax places the part with its own transform, so the tweens act on a group inside it.
+function texPart(el, name) {
+  const part = el.querySelector(`g.${CSS.escape(name)}`);
+  if (!part) throw new Error(`texPart: no \\class{${name}}{…} in this formula`);
+  if (!part._tweenGroup) {
+    const group = mk('g');
+    group.append(...part.childNodes);
+    part.append(group);
+    const color = part.closest('[color]')?.getAttribute('color');   // the formula's fill
+    put(group, /^#[\da-f]{6}$/i.test(color) ? { c_color: color } : {});
+    part._tweenGroup = group;
+  }
+  return part._tweenGroup;
+}
 const OV = x => ({ ov: String(x) });                    // digits under a repeat bar: ['0.', OV('3')] is 0.333…
-// Math expression from parts: 'text' | F(n,d) | R(x) | E(exp) | OV(digits). Baseline at y; anchor start/middle/end.
+// Math expression from parts: 'text' | F(n,d) | R(x) | E(exp) | OV(digits) | TX(tex). Baseline at y; anchor start/middle/end.
+// _ascent and _descent are the TeX parts' height above and below the baseline (0 without TX).
 function M(parent, parts, { x = 0, y = 0, size = 36, fill = COL.chalk, anchor = 'middle', o = 1, s = 1 } = {}) {
   const g = G(parent, { x, y, o, s });
   const inner = mk('g', {}, g);
@@ -158,10 +299,18 @@ function M(parent, parts, { x = 0, y = 0, size = 36, fill = COL.chalk, anchor = 
     return w;
   };
   const rule = (x1, x2, yy) => mk('path', { d: `M${x1} ${yy}H${x2}`, stroke: fill, 'stroke-width': lw, 'stroke-linecap': 'round' }, inner);
-  let cx = 0;
+  let cx = 0, ascent = 0, descent = 0;
   for (const p of parts) {
     if (typeof p === 'string') cx += text(p, cx, 0, size);
-    else if (p.f) {
+    else if (p.tex !== undefined) {
+      const { graphic, viewBox: [, top, w, h] } = texGraphic(p.tex), k = size / 1000;   // 1000 units = 1 em = size
+      graphic.setAttribute('transform', `translate(${cx},0) scale(${k})`);
+      graphic.setAttribute('color', fill);   // MathJax paints with currentColor
+      inner.append(graphic);
+      ascent = Math.max(ascent, -top * k);
+      descent = Math.max(descent, (top + h) * k);
+      cx += w * k;
+    } else if (p.f) {
       const fs = size * .72, [n, d] = p.f, wn = textW(n, fs), wd = textW(d, fs);
       const w = Math.max(wn, wd) + size * .2, bar = -size * .3;
       text(n, cx + (w - wn) / 2, bar - size * .12, fs);
@@ -194,6 +343,8 @@ function M(parent, parts, { x = 0, y = 0, size = 36, fill = COL.chalk, anchor = 
   const dx = anchor === 'middle' ? -cx / 2 : anchor === 'end' ? -cx : 0;
   inner.setAttribute('transform', `translate(${dx},0)`);
   g._w = cx;
+  g._ascent = ascent;
+  g._descent = descent;
   return g;
 }
 // Pill-shaped number token, centred on (x, y).
@@ -201,7 +352,13 @@ function chip(parent, parts, color, { x = 0, y = 0, o = 1, s = 1, size = 34 } = 
   const g = G(parent, { x, y, o, s });
   const rect = mk('rect', {}, g);
   const m = M(g, parts, { size, y: size * .3 });
-  const w = Math.max(m._w + 36, 64), h = size * (parts.some(p => p.f) ? 1.75 : 1.45);
+  const w = Math.max(m._w + 36, 64);
+  let h = size * (parts.some(p => p.f) ? 1.75 : 1.45);
+  if (m._ascent) {   // a TeX formula: centre it and grow the pill to fit
+    const above = Math.max(size * 1.05, m._ascent), below = Math.max(size * .45, m._descent);
+    put(m, { y: (above - below) / 2 });
+    h = Math.max(h, m._ascent + m._descent + size * .4);
+  }
   for (const [k, v] of Object.entries({ x: -w / 2, y: -h / 2, width: w, height: h, rx: h / 2, fill: COL.board, stroke: color, 'stroke-width': 2.5 })) rect.setAttribute(k, v);
   g._rect = rect;
   return g;
@@ -228,8 +385,14 @@ function layRow(els, { x, y, size, anchor }, move) {
 function collapse(row, i, j, parts, t0, { color = COL.task, fill = COL.chalk, live = false } = {}) {
   const run = live ? fx : tw, p = row[0].parentNode, { size, y } = row;
   const left = row[i]._px - row[i]._w / 2, right = row[j]._px + row[j]._w / 2;
+  let above = size * .95, height = size * 1.3;
+  const tall = row.slice(i, j + 1).filter(e => e._ascent);   // TeX tokens may reach higher and lower than text
+  if (tall.length) {
+    above = Math.max(above, ...tall.map(e => e._ascent + 8));
+    height = above + Math.max(size * .35, ...tall.map(e => e._descent + 8));
+  }
   const box = put(mk('rect', { rx: 10, fill: 'none', stroke: color, 'stroke-width': 3 }, p),
-    { o: 0, a_x: left - 8, a_y: y - size * .95, a_width: right - left + 16, a_height: size * 1.3 });
+    { o: 0, a_x: left - 8, a_y: y - above, a_width: right - left + 16, a_height: height });
   run(box, { o: 1 }, t0, .3);
   run(box, { o: 0 }, t0 + 1.2, .3);
   const res = M(p, parts, { size, fill, o: 0, x: (left + right) / 2, y });
@@ -691,7 +854,7 @@ const pickPoint = (P, ans, yes, no, onRight, test) => (body, api) => {
   return {
     reveal() { moveTo(...ans); P.dot(ans[0], ans[1], COL.good, 0, { run: fx, into: L }); onRight?.(); return typeof yes === 'function' ? yes(...ans) : yes; },
     lock() { locked = true; },
-    hint: [kbd('←'), kbd('↑'), kbd('↓'), kbd('→'), ' move, ', kbd('Enter'), ' choose, or click the grid'],
+    hint: [kbd('←'), kbd('↑'), kbd('↓'), kbd('→'), translate('hintMove'), kbd('Enter'), translate('hintChooseOrClickGrid')],
     key(e) {
       if (locked) return false;
       const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
@@ -757,11 +920,16 @@ function brace(p, a, b, y, label, color, t0) {
 function mathEl(parts, size = 22) {
   const svg = mk('svg', { class: 'm', 'font-weight': 400 });   // widths are measured at normal weight, so a bold prompt must not thicken the math
   const m = M(svg, parts, { size, anchor: 'start', fill: 'currentColor' });
-  const top = size * 1.05, h = size * 1.5;
+  let top = size * 1.05, bottom = size * .45, h = size * 1.5;
+  if (m._ascent) {   // a TeX formula may reach higher and lower than text
+    top = Math.max(top, m._ascent + size * .1);
+    bottom = Math.max(bottom, m._descent + size * .1);
+    h = top + bottom;
+  }
   svg.setAttribute('viewBox', `0 ${-top} ${m._w + 2} ${h}`);
   svg.setAttribute('width', m._w + 2);
   svg.setAttribute('height', h);
-  svg.style.verticalAlign = `${-size * .45}px`;  // line up the math baseline with the text baseline
+  svg.style.verticalAlign = `${-bottom}px`;  // line up the math baseline with the text baseline
   return svg;
 }
 
@@ -915,7 +1083,7 @@ const scene = document.getElementById('scene');
 const S = {};
 const AXIS = { o: 800, u: 120 };             // number line: x of 0, pixels per unit; a chapter may change it
 const X = v => AXIS.o + AXIS.u * v, Y0 = 610;
-const num = v => (v < 0 ? '−' : '') + Math.abs(v);
+const num = v => (v < 0 ? '−' : '') + String(Math.abs(v)).replace('.', DECIMAL_SIGN);
 function reset() {
   scene.replaceChildren();
   for (const k in S) delete S[k];
@@ -986,29 +1154,29 @@ function hopsFx(n) {
     const a = X(1 - k), b = X(-k);
     fx(path(S.q, `M${a} ${Y0 - 12}Q${(a + b) / 2} ${Y0 - 84} ${b} ${Y0 - 12}`, { stroke: COL.int, 'stroke-width': 3 }, { d: 0 }), { d: 1 }, (k - 1) * .35, .35, lin);
   }
-  floatText(`${-n} steps left of 0`, X(n / 2), Y0 - 100, COL.int);
+  floatText(translate('stepsLeftOfZero', { n: -n }), X(n / 2), Y0 - 100, COL.int);
 }
 
 /* ---------- shared answer columns ---------- */
 const FAMILIES = ['nat', 'whole', 'int', 'rat', 'irr', 'real'];
-const FAM_COLS = FAMILIES.map(k => [k, k === 'int' ? 'Integer' : NAME[k], COL[k]]);
-const TF = [['t', 'True', null, 'T'], ['f', 'False', null, 'F']];
+const FAM_COLS = FAMILIES.map(k => [k, k === 'int' ? translate('integerColumn') : NAME[k], COL[k]]);
+const TF = [['t', translate('trueLabel'), null, 'T'], ['f', translate('falseLabel'), null, 'F']];
 function finishCard() {
   const c = card(SCREEN, 'fin');
   const sum = pre => Object.entries(SCORE).filter(([k]) => k.startsWith(pre)).reduce((a, [, v]) => [a[0] + v.right, a[1] + v.total], [0, 0]);
-  const line = (name, [r, t]) => h('p', 'fb', t ? `${name}: ${r} of ${t} right on the first try.` : `${name}: not attempted.`);
+  const line = (name, [r, t]) => h('p', 'fb', t ? translate('firstTryScore', { name, r, t }) : translate('notAttempted', { name }));
   progress(p => { p.done = [...new Set([...(p.done || []), CHAPTER.number])]; });
-  const home = h('a', 'btn quiet', 'All chapters');
+  const home = h('a', 'btn quiet', translate('allChapters'));
   home.href = $('bHome').href;
-  const again = h('button', 'btn' + (CHAPTER.next ? ' quiet' : ' go'), ['Watch again', kbd(CHAPTER.next ? 'R' : 'Enter')]);
+  const again = h('button', 'btn' + (CHAPTER.next ? ' quiet' : ' go'), [translate('watchAgain'), kbd(CHAPTER.next ? 'R' : 'Enter')]);
   again.onclick = restart;
-  const next = CHAPTER.next && h('button', 'btn go', ['Next chapter', kbd('Enter')]);
+  const next = CHAPTER.next && h('button', 'btn go', [translate('nextChapter'), kbd('Enter')]);
   if (next) next.onclick = () => { location.href = CHAPTER.next; };
   P.keys = e => e.key === 'Enter' ? ((next ? next.onclick() : restart()), true)
-    : (e.key === 'r' || e.key === 'R') ? (restart(), true) : false;
+    : isShortcut(e, 'r') ? (restart(), true) : false;
   const guide = mascotEl(240);
-  c.append(h('div', 'finwrap', [guide, h('p', 'kicker', `Chapter ${CHAPTER.number} complete`), h('p', 'prompt', CHAPTER.title),
-    line('Quick checks', sum('c-')), line('Chapter practice', sum('p-')), h('div', 'acts', next ? [home, again, next] : [home, again])]));
+  c.append(h('div', 'finwrap', [guide, h('p', 'kicker', translate('chapterComplete', { n: CHAPTER.number })), h('p', 'prompt', CHAPTER.title),
+    line(translate('quickChecks'), sum('c-')), line(translate('chapterPractice'), sum('p-')), h('div', 'acts', next ? [home, again, next] : [home, again])]));
   setTimeout(() => mood(guide, 'happy'), 400);
 }
 
@@ -1077,15 +1245,15 @@ function mood(el, m) {
   if (m) el.classList.add(m);
 }
 // A sequence of questions in one card. Each question: { id, prompt, build(body, api) -> { check?, reveal, lock? } }.
-function quiz(pos, qs, done, label = 'Quick check') {
+function quiz(pos, qs, done, label = translate('quickCheck')) {
   const c = card(pos, 'quiz');
   let k = 0;
   const show = () => {
     const q = qs[k];
     let first = true, resolved = false;
     const fb = h('div', 'fb'), body = h('div', 'body'), acts = h('div', 'acts');
-    const bCheck = h('button', 'btn', ['Check', kbd('Enter')]), bShow = h('button', 'btn quiet', ['Show answer', kbd('S')]);
-    const bNext = h('button', 'btn go', [k < qs.length - 1 ? 'Next question' : 'Continue', kbd('Enter')]);
+    const bCheck = h('button', 'btn', [translate('check'), kbd('Enter')]), bShow = h('button', 'btn quiet', [translate('showAnswer'), kbd('S')]);
+    const bNext = h('button', 'btn go', [k < qs.length - 1 ? translate('nextQuestion') : translate('continue'), kbd('Enter')]);
     bShow.hidden = bNext.hidden = true;
     const guide = pos.cls === 'band' || pos.cls === 'side' ? mascotEl(pos.cls === 'band' ? 108 : 70) : null;
     const say = (cls, parts) => { fb.className = 'fb ' + cls; fb.replaceChildren(rich(parts, 24)); fb.style.animation = 'none'; void fb.offsetWidth; fb.style.animation = ''; };
@@ -1100,7 +1268,7 @@ function quiz(pos, qs, done, label = 'Quick check') {
       grade(ok, msg, score) {
         if (resolved) return;
         if (first) { if (!Object.hasOwn(SCORE, q.id)) SCORE[q.id] = score || { right: +ok, total: 1 }; first = false; }
-        say(ok ? 'ok' : 'no', [ok ? 'Correct. ' : 'Not quite. ', ...[].concat(msg || [])]);
+        say(ok ? 'ok' : 'no', [ok ? translate('correct') : translate('notQuite'), ...[].concat(msg || [])]);
         if (guide) {
           mood(guide, ok ? 'happy' : 'oops');
           if (!ok) setTimeout(() => { if (guide.classList.contains('oops')) mood(guide, null); }, 1600);
@@ -1111,18 +1279,18 @@ function quiz(pos, qs, done, label = 'Quick check') {
     const ctl = q.build(body, api);
     if (ctl.check) { bCheck.onclick = () => ctl.check(); acts.append(bCheck); }
     acts.append(bShow, bNext);
-    bShow.onclick = () => { say('', ['Answer: ', ...[].concat(ctl.reveal())]); resolve(); };
+    bShow.onclick = () => { say('', [translate('answerPrefix'), ...[].concat(ctl.reveal())]); resolve(); };
     bNext.onclick = () => { if (k < qs.length - 1) { k++; show(); } else done(); };
     P.keys = e => {
       if (e.key === 'Enter' && resolved) { bNext.click(); return true; }
       if (!resolved && ctl.key?.(e)) return true;
       if (e.key === 'Enter' && !resolved && ctl.check) { bCheck.click(); return true; }
-      if ((e.key === 's' || e.key === 'S') && !bShow.hidden) { bShow.click(); return true; }
+      if (isShortcut(e, 's') && !bShow.hidden) { bShow.click(); return true; }
       return false;
     };
-    const kick = label + (qs.length > 1 ? `   ${k + 1} of ${qs.length}` : '');
+    const kick = label + (qs.length > 1 ? '   ' + translate('countOf', { k: k + 1, n: qs.length }) : '');
     const head = h('div', 'head', [h('p', 'kicker', kick), h('p', 'prompt', [rich(q.prompt, pos.cls.startsWith('screen') ? 38 : 28)])]);   // match the prompt's type size
-    if (ctl.hint) head.append(h('p', 'keys', ['Keys: ', ...ctl.hint]));
+    if (ctl.hint) head.append(h('p', 'keys', [translate('keysPrefix'), ...ctl.hint]));
     c.replaceChildren(...(guide ? [guide] : []), head, fb, body, acts);
   };
   show();
@@ -1164,7 +1332,7 @@ const tap = (values, right, yes, no, onRight) => (body, api) => {
     g.classList.add('hit');
     g.setAttribute('tabindex', 0);
     g.setAttribute('role', 'button');
-    g.setAttribute('aria-label', `The point ${num(v)}`);
+    g.setAttribute('aria-label', translate('pointLabel', { v: num(v) }));
     mk('circle', { r: 30, class: 'ring' }, g);
     const act = () => {
       if (locked) return;
@@ -1180,7 +1348,7 @@ const tap = (values, right, yes, no, onRight) => (body, api) => {
   return {
     reveal() { hits[right].classList.add('good'); onRight?.(); return yes; },
     lock() { locked = true; },
-    hint: [kbd('←'), kbd('→'), ' move along the line, ', kbd('Enter'), ' choose'],
+    hint: [kbd('←'), kbd('→'), translate('hintMoveAlongLine'), kbd('Enter'), translate('hintChoose')],
     key(e) {
       const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
       if (!d || locked) return false;
@@ -1213,7 +1381,7 @@ const tapEls = (row, idx, right, yes, no, onRight) => (body, api) => {
   return {
     reveal() { hits[idx.indexOf(right)].classList.add('good'); onRight?.(); return yes; },
     lock() { locked = true; },
-    hint: [kbd('←'), kbd('→'), ' move, ', kbd('Enter'), ' choose'],
+    hint: [kbd('←'), kbd('→'), translate('hintMove'), kbd('Enter'), translate('hintChoose')],
     key(e) {
       const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
       if (!d || locked) return false;
@@ -1246,7 +1414,7 @@ const pickEls = (items, right, yes, no, onRight) => (body, api) => {
   return {
     reveal() { hits[right].classList.add('good'); onRight?.(); return yes; },
     lock() { locked = true; },
-    hint: [kbd('←'), kbd('→'), ' move, ', kbd('Enter'), ' choose, or click'],
+    hint: [kbd('←'), kbd('→'), translate('hintMove'), kbd('Enter'), translate('hintChooseOrClick')],
     key(e) {
       const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
       if (!d || locked) return false;
@@ -1302,7 +1470,7 @@ const grid = (items, cols, { multi = true, text = false } = {}) => (body, api) =
     check() {
       const right = rows.filter(judge).length;
       const all = right === rows.length;
-      api.grade(all, single ? rows[0].it.why : all ? [] : [`${right} of ${rows.length} right. Fix the rows marked ✗ and check again.`], { right, total: rows.length });
+      api.grade(all, single ? rows[0].it.why : all ? [] : [translate('rowsRight', { r: right, n: rows.length })], { right, total: rows.length });
     },
     reveal() {
       for (const r of rows) {
@@ -1310,10 +1478,10 @@ const grid = (items, cols, { multi = true, text = false } = {}) => (body, api) =
         judge(r);
         if (!single) r.why.replaceChildren(rich(r.it.why, 20));
       }
-      return single ? rows[0].it.why : 'the correct choices are now selected.';
+      return single ? rows[0].it.why : translate('choicesShown');
     },
     lock() { locked = true; showCur(); rows.forEach(r => r.bs.forEach(b => { b.disabled = true; })); },
-    hint: [...(single ? [] : [kbd('↑'), kbd('↓'), ' row, ']), ...(/\d/.test(hot[0]) ? [kbd(hot[0]), '–', kbd(hot[hot.length - 1])] : hot.map(kbd)), ' choose'],
+    hint: [...(single ? [] : [kbd('↑'), kbd('↓'), translate('hintRow')]), ...(/\d/.test(hot[0]) ? [kbd(hot[0]), '–', kbd(hot[hot.length - 1])] : hot.map(kbd)), translate('hintChoose')],
     key(e) {
       if (locked) return false;
       if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !single) {
@@ -1321,7 +1489,7 @@ const grid = (items, cols, { multi = true, text = false } = {}) => (body, api) =
         showCur();
         return true;
       }
-      const j = hot.findIndex(x => x.toLowerCase() === e.key.toLowerCase());
+      const j = hot.findIndex(x => isShortcut(e, x));
       if (j < 0) return false;
       rows[cur].bs[j].click();
       if (!multi && cur < rows.length - 1) { cur++; showCur(); }
@@ -1330,9 +1498,10 @@ const grid = (items, cols, { multi = true, text = false } = {}) => (body, api) =
   };
 };
 // Exact value of a typed answer: integer, decimal, fraction a/b or mixed number "w a/b"; returns [num, den] or null.
-// Accepts −, – or - as the sign. Never evaluates the text as code.
+// Accepts −, – or - as the sign, and a decimal comma when DECIMAL_SIGN is ','. Never evaluates the text as code.
 function rat(str) {
-  const t = String(str).trim().replace(/^[−–]/, '-').replace(/\s+/g, ' ');
+  let t = String(str).trim().replace(/^[−–]/, '-').replace(/\s+/g, ' ');
+  if (DECIMAL_SIGN === ',') t = t.replace(/^(-?\d+),(\d+)$/, '$1.$2');   // 0,75 where the decimal sign is a comma
   let m = t.match(/^(-?)(\d+)(?:\.(\d+))?$/);
   if (m) { const d = 10 ** (m[3] || '').length, n = (m[1] ? -1 : 1) * (Number(m[2]) * d + Number(m[3] || 0)); return Number.isSafeInteger(n) && Number.isSafeInteger(d) ? [n, d] : null; }
   m = t.match(/^(-?)(?:(\d+) )?(\d+) ?\/ ?(\d+)$/);
@@ -1357,7 +1526,7 @@ const blanks = rowsIn => (body, api) => {
         flush();
         const b = h('input', 'box');
         Object.assign(b, { type: 'text', inputMode: 'decimal', autocomplete: 'off', spellcheck: false });
-        b.setAttribute('aria-label', 'Answer');
+        b.setAttribute('aria-label', translate('answerBox'));
         b.dataset.ans = p.box;
         if (p.lowest) b.dataset.lowest = '1';
         b.style.width = `${Math.max(2, String(p.box).length) + 2}ch`;
@@ -1397,7 +1566,7 @@ const blanks = rowsIn => (body, api) => {
     check() {
       const right = rows.filter(judge).length, done = right === rows.length;
       const msg = single ? (done ? rows[0].it.why : rows[0].it.hint ?? rows[0].it.why)
-        : done ? [] : [`${right} of ${rows.length} right. Fix the rows marked ✗ and check again.`];
+        : done ? [] : [translate('rowsRight', { r: right, n: rows.length })];
       api.grade(done, msg, { right, total: rows.length });
     },
     reveal() {
@@ -1406,10 +1575,11 @@ const blanks = rowsIn => (body, api) => {
         judge(r);
         if (!single) r.why.replaceChildren(rich(r.it.why, 20));
       }
-      return single ? rows[0].it.why : 'the correct numbers are filled in.';
+      return single ? rows[0].it.why : translate('numbersShown');
     },
     lock() { all.forEach(b => { b.disabled = true; }); },
-    hint: [all.some(b => b.dataset.ans.includes('/')) ? 'type numbers like 3/4 or −2 1/4, ' : 'type the number, ', kbd('Tab'), ' next box, ', kbd('Enter'), ' check, ', kbd('Esc'), ' leave the box'],
+    hint: [translate(all.some(b => b.dataset.ans.includes('/')) ? 'hintTypeFraction' : all.some(b => /[.,]/.test(b.dataset.ans)) ? 'hintTypeDecimal' : 'hintTypeNumber'),
+      kbd('Tab'), translate('hintNextBox'), kbd('Enter'), translate('hintCheck'), kbd('Esc'), translate('hintLeaveBox')],
   };
 };
 // Drag number chips into the stage number map. items: [parts, smallest ring, explanation].
@@ -1418,14 +1588,14 @@ const slot = (k, n) => {
   const r = RINGS[k];
   return [r.lx + [-72, 72, 0][n % 3], r.ly + 50 + 56 * Math.floor(n / 2)];
 };
-const plain = parts => parts.map(p => typeof p === 'string' ? p : p.ov !== undefined ? p.ov + ' repeating' : p.f ? p.f.join('/') : p.sup !== undefined ? '^' + p.sup : (p.i ? p.i : '') + '√' + (p.r.f ? p.r.f.join('/') : p.r)).join('');
+const plain = parts => parts.map(p => typeof p === 'string' ? p : p.ov !== undefined ? p.ov + ' repeating' : p.tex !== undefined ? p.tex : p.f ? p.f.join('/') : p.sup !== undefined ? '^' + p.sup : (p.i ? p.i : '') + '√' + (p.r.f ? p.r.f.join('/') : p.r)).join('');
 const sorter = (items, trayXY) => (body, api) => {
   const L = qlayer();
   const bg = mk('rect', { width: 1600, height: 900, fill: 'transparent' }, L);
   const svg = $('stage');
   const pt = e => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
   let sel = null, drag = null, locked = false;
-  const label = c => c.setAttribute('aria-label', `${c.say}, ${c.region ? 'placed in ' + NAME[c.region] : 'not placed'}`);
+  const label = c => c.setAttribute('aria-label', c.region ? translate('chipPlaced', { x: c.say, ring: NAME[c.region] }) : translate('chipNotPlaced', { x: c.say }));
   const outline = (c, colr, w = 2.5) => { c._rect.setAttribute('stroke', colr); c._rect.setAttribute('stroke-width', w); };
   const choose = c => {
     if (sel) outline(sel, COL.chalk);
@@ -1487,7 +1657,7 @@ const sorter = (items, trayXY) => (body, api) => {
       const notes = h('ul');
       for (const c of chips) {
         c.querySelector('.mark')?.remove();
-        if (!c.region) { notes.append(h('li', '', `${c.say} is not placed yet.`)); continue; }
+        if (!c.region) { notes.append(h('li', '', translate('notPlacedYet', { x: c.say }))); continue; }
         const ok = c.region === c.answer;
         right += ok;
         outline(c, ok ? COL.good : COL.bad, 4);
@@ -1495,11 +1665,11 @@ const sorter = (items, trayXY) => (body, api) => {
         const w = +c._rect.getAttribute('width');
         T(c, ok ? '✓' : '✗', { x: w / 2 + 4, y: -16, size: 26, fill: ok ? COL.good : COL.bad, weight: 700 }).classList.add('mark');
         if (!ok) notes.append(h('li', '', c.region === 'real'
-          ? `${c.say}: every real number is rational or irrational, so that space has no numbers of its own.`
+          ? translate('realRingIsEmpty', { x: c.say })
           : c.why));
       }
       const all = right === chips.length;
-      api.grade(all, all ? [] : [`${right} of ${chips.length} in the right ring.`, notes], { right, total: chips.length });
+      api.grade(all, all ? [] : [translate('ringsRight', { r: right, n: chips.length }), notes], { right, total: chips.length });
     },
     reveal() {
       const count = {};
@@ -1511,10 +1681,10 @@ const sorter = (items, trayXY) => (body, api) => {
         outline(c, COL.good, 4);
         fx(c, { x, y }, i * .12, .8);
       });
-      return 'every number is now in its smallest ring.';
+      return translate('ringsShown');
     },
     lock() { locked = true; choose(null); },
-    hint: [kbd('←'), kbd('→'), ' pick a number, ', kbd('1'), '–', kbd('6'), ' choose its ring'],
+    hint: [kbd('←'), kbd('→'), translate('hintPickNumber'), kbd('1'), '–', kbd('6'), translate('hintPickRing')],
     key(e) {
       if (locked) return false;
       const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
@@ -1534,7 +1704,7 @@ const sorter = (items, trayXY) => (body, api) => {
 };
 
 /* ---------- player ---------- */
-const P = { i: 0, t: 0, end: 1, playing: false, waiting: false, done: false, started: false, audio: null, afail: false, stall: 0, cleanup: [] };
+const P = { i: 0, t: 0, end: 1, playing: false, waiting: false, done: false, started: false, audio: null, afail: false, stall: 0, cleanup: [], rate: 1, nextClip: null };
 function runBeat(i) {
   TW = [];
   const b = BEATS[i], tm = TIMINGS[b.id];
@@ -1587,14 +1757,23 @@ function seek(i, play = P.playing) {
     start(i, play);
   } finally { seeking = false; }
 }
+// Jump to a point inside beat i (frac of its narration); question beats always start at their beginning.
+function seekInto(i, frac) {
+  seek(i, true);
+  const t = BEATS[i].ask ? 0 : frac * TIMINGS[BEATS[i].id].dur;
+  if (t < .3) return;
+  P.t = t;
+  evalTo(t);
+  if (P.audio) P.audio.currentTime = t;
+}
 function start(i, play) {
   stopAudio(); clearCards();
   Object.assign(P, { i, t: 0, waiting: false, done: false, afail: false, stall: 0 });
   P.end = runBeat(i);
   evalTo(0);
-  const a = P.audio = new Audio(`audio/${CHAPTER.language || 'en'}/${BEATS[i].id}.mp3`);
-  a.preload = 'auto';
+  const a = P.audio = beatClip(i, true);
   a.volume = +($('volume')?.value ?? 1);
+  a.playbackRate = P.rate;
   // An aborted or superseded load (fast stepping, a reload) is not a failure: only a real error for the current clip
   // shows the note, and the note goes away as soon as a clip plays.
   a.onerror = () => { if (P.audio === a && a.error && a.error.code !== MediaError.MEDIA_ERR_ABORTED) soundFailed(); };
@@ -1606,7 +1785,28 @@ function start(i, play) {
   const b = BEATS[i];
   if (b.ask) b.ask(() => { if (P.i === i) { evalTo(Infinity); start(i + 1, true); } });
   setPlaying(play);
+  if (i + 1 < BEATS.length) beatClip(i + 1);
 }
+// The next beat's clip starts loading while this one plays, so a slow connection does not stall between beats.
+function beatClip(i, take) {
+  const src = `audio/${CHAPTER.language || 'en'}/${BEATS[i].id}.mp3`;
+  let a = P.nextClip?._src === src ? P.nextClip : null;
+  if (!a) {
+    if (P.nextClip && P.nextClip !== P.audio) { P.nextClip.removeAttribute('src'); P.nextClip.load(); }   // abandon a stale preload
+    a = Object.assign(new Audio(src), { preload: 'auto', _src: src });
+  }
+  P.nextClip = take ? null : a;
+  return a;
+}
+// Playback speed: the audio clock drives the picture, so changing the clip's rate keeps them together.
+const SPEEDS = [.75, 1, 1.25, 1.5];
+function setSpeed(r) {
+  P.rate = r;
+  $('bSpeed').textContent = r + '×';
+  if (P.audio) P.audio.playbackRate = r;
+  try { localStorage.setItem('speed', String(r)); } catch {}
+}
+const stepSpeed = d => setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(P.rate) + d))]);
 function soundFailed() { P.afail = true; $('soundNote').hidden = false; }
 function setPlaying(v) {
   P.playing = v;
@@ -1634,7 +1834,7 @@ function frame(now) {
     if (a && !P.afail && !a.ended) {
       if (a.currentTime > 0) { P.t = Math.max(P.t, a.currentTime); P.stall = 0; }
       else if ((P.stall += dt) > (a.readyState < 2 ? 8 : 15)) soundFailed();   // nothing to play after 8 s, or stuck for 15
-    } else P.t += dt;
+    } else P.t += dt * P.rate;
     evalTo(P.t);
     if (P.t >= P.end) beatDone();
   }
@@ -1647,8 +1847,12 @@ function buildSegs() {
   const s = h('button', 'seg' + (b.ask ? ' ask' : ''), [h('i')]);
   s.style.flex = TIMINGS[b.id].dur + (b.ask ? 12 : 0);
   s.title = b.title;
-  s.setAttribute('aria-label', `Go to step ${i + 1}: ${b.title}`);
-  s.onclick = () => { hideCover(); seek(i, true); };
+  s.setAttribute('aria-label', translate('goToStep', { n: i + 1, title: b.title }));
+  // A click lands at that point of the step; keyboard activation (no pointer position) starts the step.
+  s.onclick = e => {
+    const r = s.getBoundingClientRect();
+    hideCover(); seekInto(i, e.detail ? (e.clientX - r.left) / r.width : 0);
+  };
   $('segs').append(s);
   return s.firstChild;
   });
@@ -1690,6 +1894,8 @@ $('bPlay').onclick = togglePlay;
 $('bBack').onclick = () => { hideCover(); back1(); };
 $('bRestart').onclick = restart;
 $('bCC').onclick = () => setCaptions(!captions);
+$('bSpeed').onclick = () => setSpeed(SPEEDS[(SPEEDS.indexOf(P.rate) + 1) % SPEEDS.length]);
+try { const r = +localStorage.getItem('speed'); if (SPEEDS.includes(r)) setSpeed(r); } catch {}
 $('bFull').onclick = () => toggleFull();
 const toggleFull = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
 let helpResume = false;
@@ -1719,8 +1925,10 @@ document.addEventListener('keydown', e => {
   else if (k === 'ArrowLeft' && free) back1();
   else if (k === 'ArrowRight' && free) { if (P.i < BEATS.length - 1) seek(P.i + 1); }
   else if (k === 'Home') restart();
-  else if (k === 'c' || k === 'C') setCaptions(!captions);
-  else if (k === 'f' || k === 'F') toggleFull();
+  else if (isShortcut(e, 'c')) setCaptions(!captions);
+  else if (k === '<' || k === ',' || isShortcutCode(e, 'Comma')) stepSpeed(-1);
+  else if (k === '>' || k === '.' || isShortcutCode(e, 'Period')) stepSpeed(1);
+  else if (isShortcut(e, 'f')) toggleFull();
   else used = false;
   if (used) e.preventDefault();
 });
@@ -1744,12 +1952,12 @@ function progress(f) {
   } catch {}
 }
 function boot() {
-  $('coverK').textContent = `Chapter ${CHAPTER.number}`;
+  $('coverK').textContent = translate('chapterNumber', { n: CHAPTER.number });
   $('coverT').textContent = CHAPTER.title;
   $('bHome').href = `../#ch${String(CHAPTER.number).padStart(2, '0')}`;
   progress(p => { p.last = CHAPTER.number; });
-  document.getElementById('stage').setAttribute('aria-label', `Lesson animation: ${CHAPTER.title}`);
-  $('coverMeta').textContent = `About ${CHAPTER.minutes} minutes, with sound and quick checks.`;
+  document.getElementById('stage').setAttribute('aria-label', translate('stageLabelTitled', { title: CHAPTER.title }));
+  $('coverMeta').textContent = translate('aboutMinutes', { n: num(CHAPTER.minutes) });
   buildSegs();
   const qs = new URLSearchParams(location.search);
   if (qs.has('beat')) {
